@@ -55,7 +55,9 @@ def send_message(bot, message):
 
 
 def get_api_answer(current_timestamp):
-    """Функция делает запрос к API сервиса, преобразовывает данные к Python."""
+    """Функция делает запрос к API сервиса.
+    Возвращает ответ, преобразовывая данные к типам данных Python.
+    """
     timestamp = current_timestamp or int(time.time())
     params = {'from_date': timestamp}
 
