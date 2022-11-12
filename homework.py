@@ -126,7 +126,7 @@ def main():
             logging.info(f'Получен список работ {response}')
             if len(homework) > 0:
                 send_message(BOT, parse_status(homework[0]))
-            elif homework is None:
+            elif len(homework) == 0:
                 logging.debug('Нет новых статусов')
                 send_message(BOT, 'Нет новых статусов')
             current_timestamp = response.get('current_date', current_timestamp)
