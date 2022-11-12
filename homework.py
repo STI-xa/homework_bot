@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 import time
+from http import HTTPStatus
 
 import requests
 import telegram
@@ -35,7 +36,6 @@ HOMEWORK_STATUSES = {
 }
 
 BOT = telegram.Bot(token=TELEGRAM_TOKEN)
-STATUS_CODE_OK = 200
 
 
 class MyException(Exception):
@@ -63,7 +63,7 @@ def get_api_answer(current_timestamp):
 
     homework_statuses = requests.get(
         ENDPOINT, headers=HEADERS, params=params)
-    if homework_statuses.status_code != STATUS_CODE_OK:
+    if homework_statuses.status_code != HTTPStatus.OK:
         logging.error(
             f'Сбой работы. Ответ сервера {homework_statuses.status_code}'
         )
@@ -99,16 +99,8 @@ def parse_status(homework):
 
 def check_tokens():
     """Функция проверяет доступность переменных окружения."""
-    if PRACTICUM_TOKEN is None:
-        logging.error('PRACTICUM_TOKEN not found')
-        return False
-    if TELEGRAM_CHAT_ID is None:
-        logging.error('TELEGRAM_CHAT_ID not found')
-        return False
-    if TELEGRAM_TOKEN is None:
-        logging.error('TELEGRAM_TOKEN not found')
-        return False
-    return True
+    if all([PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]):
+        return True
 
 
 def main():
