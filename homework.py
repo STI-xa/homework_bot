@@ -2,6 +2,8 @@ import logging
 import os
 import sys
 import time
+import exceptions
+from json import JSONDecodeError
 
 import requests
 import telegram
@@ -36,54 +38,67 @@ HOMEWORK_STATUSES = {
 }
 
 
-class MyException(Exception):
-    """Кастомные исключения."""
-
-    pass
-
-
 def send_message(bot, message):
     """Функция отправляет сообщение в Telegram чат."""
     try:
         bot.send_message(chat_id=TELEGRAM_CHAT_ID, text=message)
-        logging.info(f'Сообщение {message} отправлено')
-    except MyException as error:
+    except telegram.error.TelegramError as error:
         logging.error(f'Ошибка отправки сообщения {error}')
-        send_message(bot, 'Сообщение не удалось отправить')
+    else:
+        logging.info(f'Сообщение {message} отправлено')
 
 
 def get_api_answer(current_timestamp):
     """Функция делает запрос к API сервиса.
     Возвращает ответ, преобразовывая данные к типам данных Python.
     """
-    timestamp = current_timestamp or int(time.time())
-    params = {'from_date': timestamp}
+    # timestamp = current_timestamp or int(time.time())
+    params = {'from_date': 0}
 
-    homework_statuses = requests.get(
-        ENDPOINT, headers=HEADERS, params=params)
+    try:
+        homework_statuses = requests.get(
+            ENDPOINT, headers=HEADERS, params=params)
+    except requests.exceptions.RequestException as e:
+        logging.error('Ошибка соединения')
+        raise exceptions.GeneralErorrs(f'Ошибка соединения {e}') from e
+    except JSONDecodeError as e:
+        logging.error('Ошибка формата данных')
+        raise exceptions.GeneralErorrs(f'Ошибка формата данных {e}') from e
     if homework_statuses.status_code != HTTPStatus.OK:
         logging.error(
             f'Сбой работы. Ответ сервера {homework_statuses.status_code}'
         )
-        raise ConnectionError('Сбой работы сервера')
+        raise exceptions.GeneralErorrs('Сбой работы сервера')
     return homework_statuses.json()
 
 
 def check_response(response):
     """Функция проверяет ответ API на корректность."""
-    if not isinstance(response['homeworks'], list):
-        logging.error('Запрос к серверу пришёл не в виде списка')
-        raise MyException('Запрос к серверу пришёл не в виде списка')
+    try:
+        response['homeworks']
+        if type(response) is not dict:
+            raise exceptions.CommonErrors('Ответ вернулся не в виде словаря')
+        elif 'homeworks' or 'current_date' not in response:
+            raise KeyError('Нужных ключей нет в словаре')
+    except exceptions.CommonErrors as ex:
+        if not isinstance(response['homeworks'], list):
+            raise TypeError('Запрос к серверу пришёл не в виде списка') from ex
     return response['homeworks']
 
 
-def parse_status(homework):
+def parse_status(homeworks):
     """Функция извлекает информации домашней работе и ее статус."""
-    homework_name = homework['homework_name']
-    homework_status = homework['status']
+    homework_name = homeworks['homework_name']
+    if 'homework_name' not in homework_name:
+        raise exceptions.CommonErrors(
+            'Ключ homework_name не обнаружен в словаре')
+    homework_status = homeworks['status']
+    if 'status' not in homework_status:
+        raise exceptions.CommonErrors('Ключ status не обнвружен в словаре')
     if homework_status not in HOMEWORK_STATUSES:
-        logging.error('Статус не обнаружен в списке')
-        raise ValueError('Статус не обнаружен в списке')
+        raise exceptions.CommonErrors('Статус не обнаружен в списке')
+    elif homework_status is None:
+        raise exceptions.CommonErrors('Пришел пустой список')
     verdict = HOMEWORK_STATUSES[homework_status]
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
@@ -104,28 +119,22 @@ def main():
     while True:
         try:
             response = get_api_answer(current_timestamp)
-            homework = check_response(response)
+            homeworks = check_response(response)
             logging.info(f'Получен список работ {response}')
-            if len(homework) > 0:
-                send_message(bot, parse_status(homework[0]))
-            elif len(homework) == 0:
+            if type(homeworks) is list:
+                send_message(bot, parse_status(homeworks[0]))
+            else:
                 logging.debug('Нет новых статусов')
                 send_message(bot, 'Нет новых статусов')
+                return False
             current_timestamp = response.get('current_date', current_timestamp)
-            time.sleep(RETRY_TIME)
 
-        except KeyError as error:
-            logging.error(f'{error} Отсутствуют ключи')
-            send_message(bot, f'{error} Отсутствуют ключи')
-
-        except ConnectionError:
-            send_message(bot, 'Сбой работы сервера')
-
-        except ValueError:
-            send_message(bot, 'Статус не обнаружен в списке')
-
+        except exceptions.GeneralErorrs as error:
+            logging.error(f'{error}')
+            send_message(bot, f'{error}')
         except Exception as error:
             send_message(bot, f'Сбой в работе программы: {error}')
+        finally:
             time.sleep(RETRY_TIME)
 
 
