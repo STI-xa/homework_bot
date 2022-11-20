@@ -133,7 +133,7 @@ def main():
             logging.error(f'{error}')
             send_message(bot, f'{error}')
         except Exception as error:
-            send_message(bot, f'Сбой в работе программы: {error}')
+            logging.error(f'{error}')
         finally:
             time.sleep(RETRY_TIME)
 
