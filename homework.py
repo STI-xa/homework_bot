@@ -52,8 +52,8 @@ def get_api_answer(current_timestamp):
     """Функция делает запрос к API сервиса.
     Возвращает ответ, преобразовывая данные к типам данных Python.
     """
-    # timestamp = current_timestamp or int(time.time())
-    params = {'from_date': 0}
+    timestamp = current_timestamp or int(time.time())
+    params = {'from_date': timestamp}
 
     try:
         homework_statuses = requests.get(
@@ -79,7 +79,7 @@ def check_response(response):
         if type(response) is not dict:
             raise exceptions.CommonErrors('Ответ вернулся не в виде словаря')
         elif 'homeworks' or 'current_date' not in response:
-            raise KeyError('Нужных ключей нет в словаре')
+            raise exceptions.CommonErrors('Нужных ключей нет в словаре')
     except exceptions.CommonErrors as ex:
         if not isinstance(response['homeworks'], list):
             raise TypeError('Запрос к серверу пришёл не в виде списка') from ex
@@ -89,11 +89,11 @@ def check_response(response):
 def parse_status(homeworks):
     """Функция извлекает информации домашней работе и ее статус."""
     homework_name = homeworks['homework_name']
-    if 'homework_name' not in homework_name:
+    if 'homework_name' not in homeworks:
         raise exceptions.CommonErrors(
             'Ключ homework_name не обнаружен в словаре')
     homework_status = homeworks['status']
-    if 'status' not in homework_status:
+    if 'status' not in homeworks:
         raise exceptions.CommonErrors('Ключ status не обнвружен в словаре')
     if homework_status not in HOMEWORK_STATUSES:
         raise exceptions.CommonErrors('Статус не обнаружен в списке')
