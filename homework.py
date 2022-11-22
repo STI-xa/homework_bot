@@ -90,10 +90,10 @@ def parse_status(homeworks):
     if 'status' not in homeworks:
         raise exceptions.CommonErrors('Ключ status не обнаружен в словаре')
     homework_status = homeworks.get('status')
+    if homework_status is None:
+        raise exceptions.CommonErrors('Пришел пустой список')
     if homework_status not in HOMEWORK_VERDICTS:
         raise exceptions.CommonErrors('Статус не обнаружен в списке')
-    elif homework_status is None:
-        raise exceptions.CommonErrors('Пришел пустой список')
     verdict = HOMEWORK_VERDICTS[homework_status]
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
@@ -107,7 +107,7 @@ def main():
     """Основная логика работы бота."""
     if not check_tokens():
         logging.critical('Токены не доступны')
-        sys.exit()
+        sys.exit('Ничего не работает, токены не доступны')
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
 
     timestamp = int(time.time())
@@ -115,11 +115,9 @@ def main():
     while True:
         try:
             response = get_api_answer(timestamp)
-            # print(response)
             homeworks = check_response(response)
-            # print(homeworks)
             logging.info(f'Получен список работ {response}')
-            if homeworks is not None:
+            if homeworks:
                 send_message(bot, parse_status(homeworks[0]))
             else:
                 logging.debug('Нет новых статусов')
